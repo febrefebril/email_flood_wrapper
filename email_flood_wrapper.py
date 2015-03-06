@@ -5,6 +5,8 @@ import sys
 # from subprocess import call, check_call
 import subprocess
 import os
+import atexit
+
 
 def verificaTamanhosMsg(tamanhoMax, tamanhoMin):
     ''' verifica o tamanho dos parametros por possível erro '''
@@ -102,7 +104,7 @@ def configuraArgumentos(p):
 
 
 def checaParametro(parametros):
-    ''' Checa os parametros '''
+    ''' Checa os parametros e seta os valores default'''
     verificaTamanhosMsg(parametros.tamanhoMaxMsg, parametros.tamanhoMinMsg)
     # verifica existencia do servidor
     if parametros.servidorSntp is None:
@@ -128,7 +130,7 @@ def checaParametro(parametros):
         parametros.listaRemetente = 'templates/remetentes.txt'
     # seta lista de destinatários
     if parametros.listaDestinatario is None:
-        parametros.listaDestinatario = 'templates/destinatario.txt'
+        parametros.listaDestinatario = 'templates/destinatarios.txt'
 
 
 def imprimeParametros(parametros):
@@ -144,58 +146,43 @@ def imprimeParametros(parametros):
     print "Servidor: %s" % parametros.servidorSntp
 
 
-def main():
+def mataTodosPostal():
+    ''' Mata todos processos do postal, é chamada quando estive saindo '''
+    subprocess.call(["killall", "postal"])
 
+
+def main():
+    ''' mae de todas as funções '''
+    # mata todos os processos do postal quando for sair
+    atexit.register(mataTodosPostal)
     euid = os.geteuid()
     if euid != 0:
         sys.exit("ERRO: este script deve ser usado com privilégio root :D")
     if len(sys.argv) == 1:
         sys.exit("ERRO: Servidor sntp está faltando! " +
-        "Este é o único parametro necessário.\nExemplo:" +
-        " python email_flood_wrapper -srv 10.0.0.20\n" +
-        "para mais ajuda use: python email_flood_wrapper -h")
-        # # roda postal com valores pré-determinados
-        # servidor = "10.0.0.20"
-        # print "Será lançado um teste de flood de email com os seguintes",
-        # "parametros:"
-        # print "Tamanho máximo da mensagem: 20 Mb"
-        # print "Usuários simultâneos (threads): 20"
-        # print "SSL: 50% das mensagens"
-        # print "servidor: %s" % servidor
-        # resposta = raw_input(
-        #     "Deseja rodar os testes contra esses valores?(s/N)"
-        #     )
-        # if resposta == 's':
-        #     print "rodando o script"
-        #     subprocess.check_call(
-        #         ["postal", "-m", "0", "-t", "20", "-c", "0",
-        #          "-f", "templates/remetente.txt",
-        #          servidor, "templates/destinatario.txt"]
-        #         )
-        # # call(["postal", "-m 0", "-t 20", "-c 0", "-s 50",
-        # #       "-f templates/remetente '10.0.0.20' templates/destinatario"])
-        # else:
-        #     sys.exit("Boa escolha")
+                 "Este é o único parametro necessário.\nExemplo:" +
+                 " python email_flood_wrapper -srv 10.0.0.20\n" +
+                 "para mais ajuda use: python email_flood_wrapper -h")
     else:
-        # checa os parametros
+        # cria os parametros
         parser = argparse.ArgumentParser(
             description='Script usado para floodar email para testar o ASMG.',
             epilog="Parametros dentro de [] não são obrigatórios"
             )
+        # configura os parametros
         configuraArgumentos(parser)
         p = parser.parse_args()  # pega os parametros escolhidos pelo usuario
+        # checa os parametros e seta os valores default
         checaParametro(p)
+        # imprime os parametros para o usuário confirmar
         imprimeParametros(p)
-        resposta = raw_input("Deseja rodar os testes contra esses parametros?(s/N)")
-        # roda postal com valores pré-determinados
+        resposta = raw_input(
+            "Deseja rodar os testes contra esses parametros?(s/N)"
+            )
+        # roda postal com valores escolhidos pelo cliente
         if resposta == 's':
             print "rodando o script"
             print p.servidorSntp
-          #  subprocess.check_call(
-          #      ["postal", "-m", "0", "-t", "20", "-c", "0",
-          #       "-f", "templates/remetente.txt",
-          #       p.servidorSntp, "templates/destinatario.txt"]
-          #      )
             subprocess.check_call(
                 ["postal",
                  "-m", str(p.tamanhoMaxMsg),
